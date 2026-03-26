@@ -1,92 +1,82 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-
-// FIX node-fetch para versiones modernas de Node
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
+const fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Datos de prueba para que el Panel Empresa funcione de inmediato
-const candidatosSimulados = [
-  { nombre: "Juan Pérez", puntaje: 85, nivel: "Alto", decision: "Entrevistar" },
-  { nombre: "Ana Gómez", puntaje: 40, nivel: "Bajo", decision: "Rechazar" }
-];
-
-// Rutas de prueba
+// Ruta de prueba
 app.get("/", (req, res) => {
-  res.send("Servidor funcionando OK en Render");
+  res.send("API TalentiaPro funcionando 🚀");
 });
 
-app.get("/test", (req, res) => {
-  res.send("FUNCIONA TEST OK");
-});
-
-// Endpoint para el Panel Empresa
-app.get("/candidatos", (req, res) => {
-  res.json(candidatosSimulados);
-});
-
-// Endpoint principal de Evaluación
-app.post("/evaluar", async (req, res) => {
+// Evaluación de candidato
+app.post("/api/evaluate", async (req, res) => {
   try {
+
     const data = req.body;
-    console.log("Datos recibidos para evaluar:", data);
 
-    if (!data.nombre || !data.experiencia) {
-        return res.status(400).json({ error: "Faltan datos del candidato" });
-    }
+    const nombreCandidato = data.candidate?.nombre || "Candidato";
 
-    // Llamada correcta a OpenAI (Chat Completions)
+    const respuestas =
+      data.assessment?.responses
+        ?.map(r => `Pregunta: ${r.questionId}\nRespuesta: ${r.text}`)
+        .join("\n\n") || "Sin respuestas";
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
+
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
+
       body: JSON.stringify({
-        model: "gpt-4o-mini", // El modelo más eficiente y real
+
+        model: "gpt-4o-mini",
+
         messages: [
           {
             role: "system",
-            content: "Eres un experto en reclutamiento minero en Chile (normativa DS132). Evalúa al candidato entregando: 1. Puntaje (1-100), 2. Nivel (Alto/Medio/Bajo), 3. Breve recomendación técnica."
+            content:
+              "Eres un experto en reclutamiento minero chileno. Analiza las respuestas y entrega un puntaje del 1 al 100 y un dictamen técnico profesional.",
           },
+
           {
             role: "user",
-            content: `Candidato: ${data.nombre}. Cargo: ${data.cargo}. Experiencia: ${data.experiencia}.`
-          }
+            content: `Candidato: ${nombreCandidato}\n\nEvaluación:\n${respuestas}`,
+          },
         ],
-        temperature: 0.7
-      })
+      }),
     });
 
     const result = await response.json();
 
-    if (!response.ok) {
-        throw new Error(result.error?.message || "Error en la API de OpenAI");
-    }
-
-    console.log("IA respondió correctamente");
+    if (!response.ok)
+      throw new Error(result.error?.message || "Error OpenAI");
 
     res.json({
-      resultado: result.choices[0].message.content
+      result: result.choices[0].message.content,
     });
 
   } catch (error) {
-    console.error("ERROR EN EL SERVIDOR:", error.message);
+
+    console.error("ERROR:", error.message);
+
     res.status(500).json({
       error: "Error en el servidor",
-      detalle: error.message
+      detalle: error.message,
     });
+
   }
 });
 
-// Puerto dinámico obligatorio para Render
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor activo en puerto ${PORT}`);
-});
+
+app.listen(PORT, "0.0.0.0", () =>
+  console.log(`Servidor en puerto ${PORT}`)
+);
