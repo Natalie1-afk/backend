@@ -1,29 +1,62 @@
 const express = require("express");
+const fetch = require("node-fetch");
 const cors = require("cors");
-require("dotenv").config();
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 // Ruta de prueba
 app.get("/", (req, res) => {
   res.send("Servidor funcionando OK");
 });
 
-// Ruta POST (tu API)
-app.post("/api/evaluar", (req, res) => {
-  const { texto } = req.body;
+// 🔥 RUTA IMPORTANTE
+app.post("/evaluar", async (req, res) => {
+  const data = req.body;
 
-  console.log("Recibido:", texto);
+  const prompt = `
+Eres experto en reclutamiento minero en Chile.
 
-  res.json({
-    resultado: "Esto viene del backend 🚀",
-  });
+Evalúa este candidato:
+
+${JSON.stringify(data)}
+
+Entrega:
+- Puntaje en %
+- Estado (APTO / OBSERVADO / NO APTO)
+- Análisis breve profesional
+`;
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-4.1-mini",
+        input: prompt
+      })
+    });
+
+    const result = await response.json();
+
+    res.json({
+      resultado: result.output?.[0]?.content?.[0]?.text || "Sin respuesta"
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
 });
 
-// Levantar servidor
-app.listen(3000, () => {
-  console.log("Servidor corriendo en http://localhost:3000");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
 });
