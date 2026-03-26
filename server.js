@@ -1,41 +1,44 @@
 const express = require("express");
-const fetch = require("node-fetch");
-const cors = require("cors");
+const fetch = require("node-fetch"); // 👈 IMPORTANTE
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+// Middleware para leer JSON
+app.use(express.json());
 
 // Ruta de prueba
 app.get("/", (req, res) => {
   res.send("Servidor funcionando OK");
 });
 
-// 🔥 RUTA IMPORTANTE
-app.post("/evaluar", async (req, res) => {
-  const data = req.body;
+app.get("/test", (req, res) => {
+  res.send("FUNCIONA TEST OK");
+});
 
-  const prompt = `
+// Endpoint principal
+app.post("/evaluar", async (req, res) => {
+  try {
+    const data = req.body;
+
+    console.log("Datos recibidos:", data);
+
+    const prompt = `
 Eres experto en reclutamiento minero en Chile.
 
 Evalúa este candidato:
+Nombre: ${data.nombre}
+Experiencia: ${data.experiencia}
+Cargo: ${data.cargo}
 
-${JSON.stringify(data)}
-
-Entrega:
-- Puntaje en %
-- Estado (APTO / OBSERVADO / NO APTO)
-- Análisis breve profesional
+Entrega una evaluación breve y clara.
 `;
 
-  try {
+    // 🔥 LLAMADA A API (ejemplo con OpenAI-like)
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}` // 👈 usa ENV en Render
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
@@ -45,24 +48,27 @@ Entrega:
 
     const result = await response.json();
 
+    console.log("Respuesta API:", result);
+
     res.json({
-      resultado: result.output?.[0]?.content?.[0]?.text || "Sin respuesta"
+      resultado:
+        result.output?.[0]?.content?.[0]?.text ||
+        "Sin respuesta de la IA"
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error en el servidor" });
+    console.error("ERROR REAL:", error); // 👈 ahora verás el error real en Render
+
+    res.status(500).json({
+      error: "Error en el servidor",
+      detalle: error.message
+    });
   }
 });
 
+// Puerto dinámico para Render
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
-});
-app.get("/test", (req, res) => {
-  res.send("FUNCIONA TEST OK");
-});
-app.get("/test", (req, res) => {
-  res.send("FUNCIONA TEST OK");
 });
